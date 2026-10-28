@@ -70,6 +70,29 @@ function showMessage(message) {
 	`;
 }
 
+function getVideoEmbedUrl(videoUrl) {
+	try {
+		const url = new URL(videoUrl);
+
+		if (url.hostname.includes('youtube.com')) {
+			const videoId = url.searchParams.get('v');
+			return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+		}
+
+		if (url.hostname === 'youtu.be') {
+			return `https://www.youtube.com/embed/${url.pathname.slice(1)}`;
+		}
+
+		if (url.hostname.includes('vimeo.com')) {
+			return `https://player.vimeo.com/video${url.pathname}`;
+		}
+	} catch (error) {
+		console.error('Video URL error:', error);
+	}
+
+	return null;
+}
+
 // Convert one APOD object into a gallery card.
 function createGalleryCard(apodItem) {
 	// APOD sometimes returns videos instead of images.
@@ -77,7 +100,7 @@ function createGalleryCard(apodItem) {
 	const mediaMarkup = apodItem.media_type === 'image'
 		? `<img src="${apodItem.url}" alt="${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
 		: apodItem.thumbnail_url
-			? `<img src="${apodItem.thumbnail_url}" alt="Video thumbnail for ${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
+			? `<div class="video-preview"><img src="${apodItem.thumbnail_url}" alt="Video thumbnail for ${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" /><span>Play video</span></div>`
 			: `<div class="video-thumbnail">Video APOD</div>`;
 
 	return `
@@ -94,9 +117,14 @@ function closeModal() {
 }
 
 function openModal(apodItem) {
+	const videoEmbedUrl = apodItem.media_type === 'video' ? getVideoEmbedUrl(apodItem.url) : null;
 	const modalMediaMarkup = apodItem.media_type === 'image'
 		? `<img class="modal-image" src="${apodItem.hdurl || apodItem.url}" alt="${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
-		: `<p>This APOD entry is a video. <a href="${apodItem.url}" target="_blank" rel="noopener noreferrer">Watch here</a></p>`;
+		: apodItem.videoSource
+			? `<video class="modal-video" src="${apodItem.videoSource}" controls playsinline></video>`
+		: videoEmbedUrl
+			? `<iframe class="modal-video" src="${videoEmbedUrl}" title="${apodItem.title}" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>`
+			: `<p>This APOD entry is a video. <a href="${apodItem.url}" target="_blank" rel="noopener noreferrer">Watch here</a></p>`;
 
 	modalBody.innerHTML = `
 		${modalMediaMarkup}
@@ -124,27 +152,47 @@ function addGalleryClickHandlers() {
 }
 
 // Use NASA's image library when APOD returns its temporary placeholder record.
-async function fetchNasaLibraryImages() {
-	const response = await fetch('https://images-api.nasa.gov/search?q=space&media_type=image&page_size=12');
+async function fetchNasaLibraryImages(startDate, endDate) {
+	const startYear = startDate.slice(0, 4);
+	const endYear = endDate.slice(0, 4);
+	const searchUrl = new URL('https://images-api.nasa.gov/search');
+	searchUrl.searchParams.set('q', 'space');
+	searchUrl.searchParams.set('media_type', 'image,video');
+	searchUrl.searchParams.set('year_start', startYear);
+	searchUrl.searchParams.set('year_end', endYear);
+	searchUrl.searchParams.set('page_size', '100');
 
+	const response = await fetch(searchUrl);
 	if (!response.ok) {
 		throw new Error(`Image library request failed with status ${response.status}`);
 	}
 
 	const data = await response.json();
-	return data.collection.items.map((item) => {
+	return data.collection.items
+		.filter((item) => {
+			const itemDate = item.data[0].date_created.split('T')[0];
+			return itemDate >= startDate && itemDate <= endDate;
+		})
+		.slice(0, 12)
+		.map((item) => {
 		const imageData = item.data[0];
 		const imageId = imageData.nasa_id;
+		const mediumLink = item.links?.find((link) => link.href.endsWith('~medium.jpg'));
+		const previewUrl = mediumLink?.href || `https://images-assets.nasa.gov/image/${imageId}/${imageId}~medium.jpg`;
 
 		return {
 			date: imageData.date_created.split('T')[0],
 			title: imageData.title,
 			explanation: imageData.description || 'NASA image library photo.',
-			media_type: 'image',
-			url: `https://images-assets.nasa.gov/image/${imageId}/${imageId}~medium.jpg`,
-			hdurl: `https://images-assets.nasa.gov/image/${imageId}/${imageId}~large.jpg`
+			media_type: imageData.media_type,
+			url: previewUrl,
+			hdurl: previewUrl,
+			thumbnail_url: imageData.media_type === 'video' ? previewUrl : undefined,
+			videoSource: imageData.media_type === 'video'
+				? `https://images-assets.nasa.gov/video/${imageId}/${imageId}~medium.mp4`
+				: undefined
 		};
-	});
+		});
 }
 
 // Fetch APOD entries for the date range and render them in the gallery.
@@ -177,7 +225,13 @@ async function fetchAndDisplayApodRange() {
 			&& data.every((item) => item.title === 'NASA Science');
 
 		if (isPlaceholderResponse) {
-			const libraryItems = await fetchNasaLibraryImages();
+			const libraryItems = await fetchNasaLibraryImages(startDate, endDate);
+
+			if (libraryItems.length === 0) {
+				showMessage('NASA APOD is temporarily unavailable, and no matching NASA library media was found for these dates.');
+				return;
+			}
+
 			currentApodItems = libraryItems;
 			gallery.innerHTML = libraryItems.map((item) => createGalleryCard(item)).join('');
 			addGalleryClickHandlers();

@@ -196,6 +196,30 @@ button:focus,
   transform: scale(1.06);
 }
 
+.video-preview {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--nasa-blue);
+}
+
+.video-preview img {
+  height: 100%;
+}
+
+.video-preview span {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--nasa-white);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .video-thumbnail {
   width: 100%;
   height: 200px;
@@ -295,6 +319,14 @@ button:focus,
   max-height: 70vh;
   object-fit: contain;
   border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  background: #111;
+}
+
+.modal-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
   margin-bottom: 16px;
   background: #111;
 }
