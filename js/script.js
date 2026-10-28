@@ -10,7 +10,7 @@ const closeModalButton = document.getElementById('closeModalButton');
 
 // Paste your own NASA API key between the quotes below.
 // Keep DEMO_KEY as a fallback while testing.
-const myNasaApiKey = 'DF5ZhRSgCYmmvuZpeFPRBVezCz8Rn6GOryKVPMDB';
+const myNasaApiKey = 'BQMtLM7pqDR9nQfknh9MmnPTdcrpwbLQPjNLgJhD';
 const apiKey = myNasaApiKey || 'DEMO_KEY';
 const baseUrl = 'https://api.nasa.gov/planetary/apod';
 let currentApodItems = [];
@@ -75,9 +75,9 @@ function createGalleryCard(apodItem) {
 	// APOD sometimes returns videos instead of images.
 	// We use NASA thumbnail support when available.
 	const mediaMarkup = apodItem.media_type === 'image'
-		? `<img src="${apodItem.url}" alt="${apodItem.title}" />`
+		? `<img src="${apodItem.url}" alt="${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
 		: apodItem.thumbnail_url
-			? `<img src="${apodItem.thumbnail_url}" alt="Video thumbnail for ${apodItem.title}" />`
+			? `<img src="${apodItem.thumbnail_url}" alt="Video thumbnail for ${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
 			: `<div class="video-thumbnail">Video APOD</div>`;
 
 	return `
@@ -95,7 +95,7 @@ function closeModal() {
 
 function openModal(apodItem) {
 	const modalMediaMarkup = apodItem.media_type === 'image'
-		? `<img class="modal-image" src="${apodItem.hdurl || apodItem.url}" alt="${apodItem.title}" />`
+		? `<img class="modal-image" src="${apodItem.hdurl || apodItem.url}" alt="${apodItem.title}" onerror="this.onerror=null; this.src='img/NASA-Logo-Large.jpg';" />`
 		: `<p>This APOD entry is a video. <a href="${apodItem.url}" target="_blank" rel="noopener noreferrer">Watch here</a></p>`;
 
 	modalBody.innerHTML = `
