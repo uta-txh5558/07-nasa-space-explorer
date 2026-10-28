@@ -123,6 +123,30 @@ function addGalleryClickHandlers() {
 	});
 }
 
+// Use NASA's image library when APOD returns its temporary placeholder record.
+async function fetchNasaLibraryImages() {
+	const response = await fetch('https://images-api.nasa.gov/search?q=space&media_type=image&page_size=12');
+
+	if (!response.ok) {
+		throw new Error(`Image library request failed with status ${response.status}`);
+	}
+
+	const data = await response.json();
+	return data.collection.items.map((item) => {
+		const imageData = item.data[0];
+		const imageId = imageData.nasa_id;
+
+		return {
+			date: imageData.date_created.split('T')[0],
+			title: imageData.title,
+			explanation: imageData.description || 'NASA image library photo.',
+			media_type: 'image',
+			url: `https://images-assets.nasa.gov/image/${imageId}/${imageId}~medium.jpg`,
+			hdurl: `https://images-assets.nasa.gov/image/${imageId}/${imageId}~large.jpg`
+		};
+	});
+}
+
 // Fetch APOD entries for the date range and render them in the gallery.
 async function fetchAndDisplayApodRange() {
 	const startDate = startInput.value;
@@ -149,6 +173,16 @@ async function fetchAndDisplayApodRange() {
 		}
 
 		const data = await response.json();
+		const isPlaceholderResponse = Array.isArray(data)
+			&& data.every((item) => item.title === 'NASA Science');
+
+		if (isPlaceholderResponse) {
+			const libraryItems = await fetchNasaLibraryImages();
+			currentApodItems = libraryItems;
+			gallery.innerHTML = libraryItems.map((item) => createGalleryCard(item)).join('');
+			addGalleryClickHandlers();
+			return;
+		}
 
 		if (!Array.isArray(data) || data.length === 0) {
 			showMessage('No images found for this date range. Try a different range.');
